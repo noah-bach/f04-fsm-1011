@@ -1,0 +1,5 @@
+# File sinh tự động khi mô phỏng
+*.vvp
+*.vcd
+*.fst
+__pycache__/
