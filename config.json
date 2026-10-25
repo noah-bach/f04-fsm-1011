@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "version": 2,
+    "flow": "Classic"
+  },
+  "DESIGN_NAME": "tt_um_f04_fsm_1011",
+  "VERILOG_FILES": [
+    "dir::rtl/f04_mealy.sv",
+    "dir::rtl/f04_moore.sv",
+    "dir::rtl/tt_um_f04_fsm_1011.sv"
+  ],
+  "PDK": "sky130A",
+  "STD_CELL_LIBRARY": "sky130_fd_sc_hd",
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 10.0,
+  "PNR_SDC_FILE": "dir::constraints/f04.sdc",
+  "SIGNOFF_SDC_FILE": "dir::constraints/f04.sdc",
+  "FP_SIZING": "absolute",
+  "DIE_AREA": [0, 0, 200, 200],
+  "PL_TARGET_DENSITY_PCT": 45,
+  "RUN_CTS": true,
+  "RUN_MAGIC_DRC": true,
+  "RUN_KLAYOUT_DRC": true,
+  "RUN_LVS": true
+}

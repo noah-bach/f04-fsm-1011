@@ -1,0 +1,116 @@
+name: F04 RTL to GDSII
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MA_DE: F04
+  DESIGN_NAME: tt_um_f04_fsm_1011
+  CONFIG: config.json
+
+jobs:
+  mo-phong:
+    name: 1 - Mo phong F04
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cai Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+
+      - name: Chay testbench F04
+        run: bash scripts/run_sim.sh
+
+      - name: Kiem ket qua mo phong
+        run: |
+          run_dir="$(cat build/LAST_SIM_RUN.txt)"
+          if grep -qiE 'FATAL|mismatch|\bFAIL\b' "$run_dir/sim.log"; then
+            echo "::error::Simulation reported an error"
+            exit 1
+          fi
+          if ! grep -q '^PASS F04 ' "$run_dir/sim.log"; then
+            echo "::error::Missing PASS F04"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mo-phong-F04
+          path: build/sim_runs/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  rtl2gds:
+    name: 2 - LibreLane sky130A
+    runs-on: ubuntu-latest
+    needs: mo-phong
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ghi thong tin nguon
+        run: |
+          mkdir -p ci_evidence
+          git rev-parse HEAD > ci_evidence/source_commit.txt
+          date -u +%FT%TZ > ci_evidence/date_utc.txt
+          sha256sum rtl/*.sv config.json constraints/f04.sdc \
+            > ci_evidence/source_sha256.txt
+
+      - name: Cai Nix va bo nho dem FOSSi
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            extra-substituters = https://nix-cache.fossi-foundation.org
+            extra-trusted-public-keys = nix-cache.fossi-foundation.org:3+K59iFwXqKsL7BNu6Guy0v+uTlwsxYQxjspXzqLYQs=
+            extra-experimental-features = nix-command flakes
+
+      - name: Lay LibreLane va ghi phien ban nguon
+        run: |
+          git clone --depth 1 https://github.com/librelane/librelane ~/librelane
+          git -C ~/librelane rev-parse HEAD \
+            > ci_evidence/librelane_commit.txt
+
+      - name: Chay flow
+        run: |
+          cd ~/librelane
+          nix-shell --run "cd '$GITHUB_WORKSPACE' && librelane --version && librelane '$CONFIG'" \
+            2>&1 | tee "$GITHUB_WORKSPACE/ci_evidence/flow_console.log"
+
+      - name: Kiem san pham va doc metrics
+        run: |
+          GDS="$(find runs -type f -path "*/final/gds/${DESIGN_NAME}.gds" -print -quit)"
+          MJ="$(find runs -type f -path '*/final/metrics.json' -print -quit)"
+
+          if [ -z "$GDS" ] || [ ! -s "$GDS" ]; then
+            echo "::error::Missing or empty final GDS"
+            exit 1
+          fi
+          if [ -z "$MJ" ] || [ ! -s "$MJ" ]; then
+            echo "::error::Missing or empty final metrics.json"
+            exit 1
+          fi
+
+          echo "GDS: $GDS"
+          python3 .github/doc_metrics.py "$MJ" \
+            | tee ci_evidence/metrics_summary.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rtl2gds-F04
+          path: |
+            runs/**
+            ci_evidence/**
+          if-no-files-found: warn
+          retention-days: 30
