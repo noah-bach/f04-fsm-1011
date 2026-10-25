@@ -3,3 +3,7 @@
 *.vcd
 *.fst
 __pycache__/
+
+# Generated F04 files
+/build/
+*:Zone.Identifier
